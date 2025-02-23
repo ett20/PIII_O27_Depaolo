@@ -1,0 +1,435 @@
+---
+title: 'Surface kinetic model for isotopic and trace element fractionation during precipitation of calcite from aqueous solutions'
+author: "ETT"
+date: "`r Sys.Date()`"
+output: 
+  tint::tintPdf:
+    keep_tex: TRUE
+    number_sections: true
+    extra_dependencies: ["mhchem"]
+classoption: x11names
+fig_caption: yes
+toc: false
+link-citations: yes
+bibliography: 
+  EnhancedweatheringPrac.bib
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+library(ggplot2)
+library(readxl)
+library(plotly)
+#library(reshape2)
+library(gtools)
+library(MASS)
+library(ggridges)
+library(pracma)
+library(viridis)
+library(colorspace)
+library(dplyr)
+library(tidyr)
+library(zoo)
+
+#library(formatR)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, echo = FALSE, cache=FALSE,warning = FALSE, message = FALSE)
+options(htmltools.dir.version = FALSE)
+```
+
+
+```{r Define theme white, include=FALSE, echo=FALSE}
+# Define white theme (handouts) ------------------------------------------------------
+theme_white = function(base_size = 12, base_family = "") {
+  
+  theme_grey(base_size = base_size, base_family = base_family) %+replace%
+    
+    theme(
+      # Specify axis options
+      axis.line = element_blank(),  
+      axis.text.x = element_text(size = base_size*0.8, color = "black", lineheight = 0.9, face = "bold"),  
+      axis.text.y = element_text(size = base_size*0.8, color = "black", lineheight = 0.9, face = "bold"),  
+      axis.ticks = element_line(color = "black", size  =  0.2),  
+      axis.title.x = element_text(size = base_size, color = "black", margin = margin(0, 10, 0, 0), face = "bold"),  
+      axis.title.y = element_text(size = base_size, color = "black", angle = 90, margin = margin(0, 10, 0, 0), face = "bold"),  
+      axis.ticks.length = unit(0.3, "lines"),   
+      # Specify legend options
+      legend.background = element_rect(color = NA, fill = "white"),  
+      legend.key = element_rect(color = "black",  fill = "white"),  
+      legend.key.size = unit(1.2, "lines"),  
+      legend.key.height = NULL,  
+      legend.key.width = NULL,      
+      legend.text = element_text(size = base_size*0.8, color = "black"),  
+      legend.title = element_text(size = base_size*0.8, face = "bold", hjust = 0, color = "black"),  
+      legend.position = "right",  
+      legend.text.align = NULL,  
+      legend.title.align = NULL,  
+      legend.direction = "vertical",  
+      legend.box = NULL, 
+      # Specify panel options
+      panel.background = element_rect(fill = "white", color  =  NA),  
+      panel.border = element_rect(fill = NA, color = "black"),  
+      panel.grid.major = element_line(color = "grey35", size=0.05),  
+      panel.grid.minor = element_line(color = "grey20", size=0.05),  
+      panel.margin = unit(0.5, "lines"),   
+      # Specify facetting options
+      strip.background = element_rect(fill = "grey30", color = "grey10"),  
+      strip.text.x = element_text(size = base_size*0.8, color = "black"),  
+      strip.text.y = element_text(size = base_size*0.8, color = "black",angle = -90),  
+      # Specify plot options
+      plot.background = element_rect(color = "white", fill = "white"),  
+      plot.title = element_text(size = base_size*1.2, color = "black"),  
+      plot.margin = unit(rep(1, 4), "lines")
+      
+    )
+  
+}
+```
+
+\newcommand{\mathalert}[1]{\textcolor{red}{\mathbf{#1}}}
+
+```{=tex}
+\marginnote{This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.  It is similar to a jupyter notebook that you might be more familiar with.  You can both explore the code, and also compile the final document to pdf output.  This should provide you with some familiarisation of "R", as well as the science.}
+```
+
+This practical will take place on your laptops via a web-browser (hopefully).  Click on [this link](http://mybinder.org/v2/gh/ett20/PIII_O27_Depaolo/main?urlpath=rstudio) to open it.    This will open a Binder webpage which will compile into an interface that is identical to the RStudio App (it will take a few minutes to open).  Some of you will be familiar with this app, but if you have never used if before you will need to spend a few minutes familiarising yourself with it and making sure you know how to run R.
+
+
+
+
+# QUESTION: What is the difference between kinetic and equilibrium isotope fractionation?
+
+
+For calcite in equilibrium with an aqueous solution, the forward (precipitation) and backward (dissolution) reactions  can be characterised by the equations:-
+
+\begin{equation}
+R_f=k_f\gamma_{Ca}[Ca^{2+}]_{fs}\gamma_{CO_3}[CO_3^{2-}]_{fs}=k'_f[Ca^{2+}]_{fs}[CO_3^{2-}]_{fs}
+\end{equation}
+
+\begin{equation}
+R_b=k_b[CaCO_3]
+\end{equation}
+
+# QUESTION:  Show the relationship $K_{eq}=\frac{k_b}{k'_f}$ when the system for calcite precipitation is in equilibrium.
+
+```{r, fig.fullwidth=FALSE,  include=FALSE, fig.align="center", out.width="0.8\\linewidth",  fig.cap=c("Q2 Ans"), echo=FALSE}
+knitr::include_graphics("Ans/Q2_ans.png")
+```
+
+# QUESTION:  If diffusive transport is not limiting, show the following relationship.  Recall that $\Omega=IAP/K_{sp}$.
+\begin{equation}
+R_p=k'_f\cdot K_{sp}\left(\Omega_c-1\right)
+\end{equation}
+
+```{r, fig.fullwidth=FALSE,  include=FALSE, fig.align="center", out.width="0.8\\linewidth",  fig.cap=c("Q3 Ans"), echo=FALSE}
+knitr::include_graphics("Ans/Q3_ans.png")
+```
+
+
+\noindent You are provided with some data from the experimental paper by Tang 2008.  
+
+# QUESTION:  Read in the data.  Calculate $\Omega$ and make a plot of $R_p$ (y-axis) versus $\Omega$, for the exper.  Comment on the relationship given your answer to the previous question, in particular thinking about the shape of the function.  
+
+```{r Read and plot Tang 2008 Saturation Index,  warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+#, fig.cap="plot of $R_p$ (y-axis) versus $\Omega$"}
+#Define what to do if there is missing data
+na_strings <- c("NA", "n.d.", "N/A", "na","n.a.","","-","–","-9999","NAN")
+#Define a filename
+filename<-"Tang_2008.xlsx"
+#Read in the data from xlsx
+
+Tang_2008<-as.data.frame(read_excel(filename, na = na_strings, skip=1, sheet="Sheet1", col_names = TRUE))
+head(Tang_2008)
+
+#Select the data from 25C
+#Note, chances are there will be bugs across platforms because of the col headers
+#Tang_2008_25C<-Tang_2008%>%filter(`T(°C)`==25)
+
+colnames(Tang_2008)
+#Convert umol/m2/hr to mol/m2/s 
+#Tang_2008_25C$`log Rp (micromol/m2/h)`
+Tang_2008<-Tang_2008%>%mutate(`Rp mol/m2/s`=(10^`log Rp (micromol/m2/h)`)*1e-6/60/60)
+
+#Convert SI to Omega
+Tang_2008$SIcalcite
+Tang_2008<-Tang_2008%>%mutate(Omega=10^SIcalcite)
+
+
+
+#Plot with no model
+ytitle<-~paste(R[p])
+xtitle<-~paste(Omega) 
+
+
+  Omega_plot<-ggplot()+
+  geom_point(data=Tang_2008, aes(y=`Rp mol/m2/s`, x=Omega, color=as.factor(`T(°C)`)))+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)
+  
+```
+
+
+```{r Tang 2008 Saturation Index display figure,  warning=FALSE, message=FALSE, echo=TRUE, fig.cap="plot of Rp (y-axis) versus Omega"}
+Omega_plot
+```
+
+
+
+
+\noindent The effective isotopic fractionation factor for steady-state precipitation can be derived by considering the rate of change of the isotopic ratio of the solid surface layer:
+
+\begin{equation}
+r_{solid}=\frac{N_{^{44}Ca}}{N_{^{40}Ca}}
+\end{equation}
+
+where $N$ designates the number of atoms.
+
+# QUESTION: Show that at steady state (meaning that the rate of change of the isotope ratio $r_{solid}$ is zero) the following relationship holds [hint:  you may want to consider the quotient rule].
+
+\begin{equation}
+0=\frac{1}{N_{^{40}Ca}}\left(^{44}R_p-r_{solid}^{40}R_p\right)
+\end{equation}
+
+where $^{44}R_p$ and $^{40}R_p$ are the net rates of precipitation for $^{44}Ca$, and  $^{40}Ca$ respectively.
+
+
+```{r, fig.fullwidth=FALSE,  include=FALSE, fig.align="center", out.width="0.8\\linewidth",  fig.cap=c("Q5 Ans"), echo=FALSE}
+knitr::include_graphics("Ans/Q5_ans.png")
+```
+
+# OPTIONAL QUESTION (for all you heroes out there):  Show that:
+\begin{equation}
+\alpha_p=\frac{\alpha_f}{1+\frac{R_b}{R_f}\left(\frac{\alpha_f}{\alpha_{eq}}-1\right)}
+\end{equation}
+
+given the relationships:
+\begin{equation}
+^{44}R_f=\alpha_fr_{fs}\,^{40}R_f
+\end{equation}
+
+and 
+
+\begin{equation}
+^{44}R_b=\frac{\alpha_f}{\alpha_{eq}}r_{solid}\,^{40}R_b
+\end{equation}
+
+
+
+# QUESTION: Make a plot of $\alpha_p$ as a function of $R_p/R_b$.   You could assume that $\alpha_f=0.9999$ and $\alpha_eq=1.001$. Explain what the plot means.
+
+```{r Model for alpha, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE, inlcude=FALSE}
+
+alpha_f=0.999
+alpha_eq=1.001
+  
+df<-tibble("Rp_Rb"=c(2:10 %o% 10^(-4:4)))  
+df<-df%>%mutate(alpha_p=alpha_f/(1+(1/(Rp_Rb+1))*((alpha_f/alpha_eq)-1)))  
+
+
+
+ytitle<-~paste(alpha [p])
+xtitle<-~paste(R[p],"/",R[b]) 
+
+depaolo_fig_4<-ggplot()+
+  geom_path(data=df, aes(x=Rp_Rb, y=alpha_p))+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)+
+  scale_x_log10(name=xtitle)+
+  geom_hline(yintercept=alpha_eq, linetype="dashed", color = "red", size=1)+
+  geom_hline(yintercept=alpha_f, linetype="dashed", color = "blue", size=1)+
+  annotation_logticks(sides = "tb")
+
+#ggsave("depaolo_fig_4.pdf",depaolo_fig_4, width=6, height=4)
+  
+```
+```{r Depaolo_Fig4,  warning=FALSE, message=FALSE, echo=TRUE, fig.cap="plot of Rp/Rb (x-axis) versus alpha"}
+depaolo_fig_4
+```
+
+
+# QUESTION:  Plot the Ca isotope fractionation data from the Tang 2008 paper as a function of Rp.  To simplify the plot, only consider the experiments conducted at 25C.  Add a Depaolo model curve to the data, and comment on the result.
+
+```{r Read plot and model Tang 2008 Ca isotopes, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+
+#Select the data from 25C
+#Note, chances are there will be bugs across platforms because of the col headers
+Tang_2008_25C<-Tang_2008%>%filter(`T(°C)`==25)
+
+colnames(Tang_2008_25C)
+#Convert umol/m2/hr to mol/m2/s 
+
+Tang_2008_25C$`log Rp (micromol/m2/h)`
+
+Tang_2008_25C<-Tang_2008_25C%>%mutate(`Rp mol/m2/s`=(10^`log Rp (micromol/m2/h)`)*1e-6/60/60)
+
+#Plot with no model
+ytitle<-~paste(Delta ^44, Ca[solid/fluid])
+xtitle<-~paste(log(R[p])) 
+
+
+  ggplot()+
+  geom_point(data=Tang_2008_25C, aes(y=Tang_2008_25C$`Delta44/40Cacalcite-aq(permil)`, x=log10(Tang_2008_25C$`Rp mol/m2/s`)))+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)
+
+
+#Model for Tang Ca isotope data  
+alpha_f=0.9984
+alpha_eq=0.9995
+Rb = 6e-7 #mol/m2/s
+  
+df<-tibble("Rp_Rb"=c(2:10 %o% 10^(-4:4)))  
+df<-df%>%mutate(alpha_p=alpha_f/(1+(1/(Rp_Rb+1))*((alpha_f/alpha_eq)-1)),
+                Rp=Rp_Rb*Rb,
+                DeltaCa=1000*log(alpha_p))  
+
+
+Depaolo_Fig7a<-ggplot()+
+  geom_point(data=Tang_2008_25C, aes(y=Tang_2008_25C$`Delta44/40Cacalcite-aq(permil)`, x=log10(Tang_2008_25C$`Rp mol/m2/s`)))+
+  geom_path(data=df, aes(x=log10(Rp), y=DeltaCa))+
+  geom_hline(yintercept=1000*log(alpha_eq), linetype="dashed", color = "red", size=1)+
+  geom_hline(yintercept=1000*log(alpha_f), linetype="dashed", color = "blue", size=1)+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)  
+  
+#ggsave("Depaolo_Fig7a.pdf",Depaolo_Fig7a, width=6, height=4)
+
+```
+
+
+```{r Depaolo_Fig7a,  warning=FALSE, message=FALSE, echo=TRUE, fig.cap="plot of Rp (x-axis) versus the observed Ca isotope fractionation factor between fluid and calcite, at 25C"}
+Depaolo_Fig7a
+```
+\noindent The same model can be extended to trace elements such as Sr, with a modification to the maths, where $K$ is the partition coefficient:
+\begin{equation*}
+K_{p,Sr}=\left(\frac{(Sr/Ca)_{solid}}{(Sr/Ca)_{fluid}}\right)_{ss}=\frac{K_f}{1+\frac{R_b}{R_p+R_b}\left(\frac{K_f}{K_{eq}}-1\right)}
+\end{equation*}
+
+
+# QUESTION:  Plot the Sr partition coefficient data from the Tang 2008 paper as a function of Rp, and put a model through the data.
+```{r Read plot and model Tang 2008 Sr partitioning, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+
+#Select the data from 25C
+#Note, chances are there will be bugs across platforms because of the col headers
+#Tang_2008_25C<-Tang_2008%>%filter(`T(°C)`==25)
+
+colnames(Tang_2008_25C)
+#Convert umol/m2/hr to mol/m2/s 
+
+#Tang_2008_25C$`log Rp (micromol/m2/h)`
+
+Tang_2008_25C<-Tang_2008_25C%>%mutate(K_Sr=10^(`log DSr`))
+
+#Plot with no model
+ytitle<-~paste(K[Sr])
+xtitle<-~paste(log(R[p])) 
+
+
+  ggplot()+
+  geom_point(data=Tang_2008_25C, aes(y=Tang_2008_25C$K_Sr, x=log10(Tang_2008_25C$`Rp mol/m2/s`)))+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)
+
+
+#Model for Tang Sr data  
+K_f=0.24
+K_eq=0.06
+Rb = 6e-7 #mol/m2/s
+  
+df<-tibble("Rp_Rb"=c(2:10 %o% 10^(-4:4)))  
+df<-df%>%mutate(K_p=K_f/(1+(1/(Rp_Rb+1))*((K_f/K_eq)-1)),
+                Rp=Rp_Rb*Rb)  
+
+
+Teng_Sr_data<-ggplot()+
+  geom_point(data=Tang_2008_25C, aes(y=Tang_2008_25C$K_Sr, x=log10(Tang_2008_25C$`Rp mol/m2/s`)))+
+  geom_path(data=df, aes(x=log10(Rp), y=K_p))+
+  geom_hline(yintercept=K_eq, linetype="dashed", color = "red", size=1)+
+  geom_hline(yintercept=K_f, linetype="dashed", color = "blue", size=1)+
+  #scale_color_viridis()+
+  theme_white()+
+  theme(
+    legend.position = c(0.9, .74),
+    #legend.justification = c("top", "right"),
+    #legend.box.just = "right",
+    #legend.margin = margin(6, 6, 6, 6),
+    #legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.3, 'cm'),
+    legend.title = element_text(size=6), #change legend title font size
+    legend.text = element_text(size=6) #change legend text font size
+  )+
+  scale_x_continuous(name=xtitle)+
+  scale_y_continuous(name=ytitle)  
+  
+#ggsave("Teng_Sr_data.pdf",Teng_Sr_data, width=6, height=4)
+
+```
+
+
+```{r Teng_Sr_data,  warning=FALSE, message=FALSE, echo=TRUE, fig.cap="plot of Rp (x-axis) versus the observed Sr partitition coefficient data between fluid and calcite, at 25C"}
+Teng_Sr_data
+```
+
+
